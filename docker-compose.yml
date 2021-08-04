@@ -1,0 +1,17 @@
+version: "3"
+
+services:
+  mongo:
+    image: mongo
+    command: mongod --port $MONGODB_PORT
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=$MONGODB_USERNAME
+      - MONGO_INITDB_ROOT_PASSWORD=$MONGODB_PASSWORD
+    ports:
+      - $MONGODB_PORT:$MONGODB_PORT
+    restart: always
+    volumes:
+      - mongodb_volume:/data/db
+
+volumes:
+  mongodb_volume:
