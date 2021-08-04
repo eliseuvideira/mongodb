@@ -21,6 +21,7 @@ exit_with_error() {
 
 load_env() {
   IFS=$'\n'
+  # shellcheck disable=SC2046
   export $(grep -Ev '^#' "$1" | xargs -0)
   IFS=
 }
