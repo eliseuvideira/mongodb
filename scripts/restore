@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+
+script_name="$0"
+script_dir="$(realpath "$(dirname "$0")")"
+
+root_dir="$(realpath "$script_dir/..")"
+
+compose_filename="$root_dir/docker-compose.yml"
+env_filename="$root_dir/.env"
+
+usage() {
+  echo "$script_name: usage: $script_name"
+}
+
+exit_with_error() {
+  echo "$script_name: error: $1"
+  usage
+  exit 1
+}
+
+load_env() {
+  IFS=$'\n'
+  # shellcheck disable=SC2046
+  export $(grep -Ev '^#' "$1" | xargs -0)
+  IFS=
+}
+
+load_env "$env_filename"
+
+if [ "$MONGODB_USERNAME" == "" ]; then
+  exit_with_error "missing env variable MONGODB_USERNAME"
+fi
+
+if [ "$MONGODB_PASSWORD" == "" ]; then
+  exit_with_error "missing env variable MONGODB_PASSWORD"
+fi
+
+if [ "$MONGODB_PORT" == "" ]; then
+  exit_with_error "missing env variable MONGODB_PORT"
+fi
+
+if [ "$#" != "1" ]; then
+  exit_with_error "invalid number of arguments"
+fi
+
+backup_filename="$1"
+
+if [ ! -f "$backup_filename" ]; then
+  exit_with_error "$backup_filename is not a file"
+fi
+
+container_temp_filename="$(docker-compose -f "$compose_filename" exec mongo mktemp)"
+
+docker cp "$backup_filename" "$(docker-compose -f "$compose_filename" ps -q mongo):$container_temp_filename"
+
+docker-compose -f "$compose_filename" \
+  exec mongo mongorestore \
+  --username "$MONGODB_USERNAME" \
+  --password "$MONGODB_PASSWORD" \
+  --port "$MONGODB_PORT" \
+  --archive="$container_temp_filename"
+
+docker-compose -f "$compose_filename" exec mongo rm "$container_temp_filename"
