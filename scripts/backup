@@ -41,6 +41,11 @@ fi
 
 container_temp_filename="$(docker-compose -f "$compose_filename" exec mongo mktemp)"
 
-docker-compose -f "$compose_filename" exec mongo mongodump --username "$MONGODB_USERNAME" --password "$MONGODB_PASSWORD" --port "$MONGODB_PORT" --archive="$container_temp_filename"
+docker-compose -f "$compose_filename" \
+  exec mongo mongodump \
+  --username "$MONGODB_USERNAME" \
+  --password "$MONGODB_PASSWORD" \
+  --port "$MONGODB_PORT" \
+  --archive="$container_temp_filename"
 
 docker cp "$(docker-compose -f "$compose_filename" ps -q mongo):$container_temp_filename" "$backup_filename"
