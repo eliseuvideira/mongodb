@@ -3,15 +3,15 @@
 set -e
 set -u
 
-script_name="$(basename "$0")"
-script_dir="$(realpath "$(dirname "$0")")"
+script_name="$(basename "${0}")"
+script_dir="$(realpath "$(dirname "${0}")")"
 
 usage() {
   echo "${script_name}: usage: ${script_name}" >&2
 }
 
 exit_with_error() {
-  echo "${script_name}: error: $1" >&2
+  echo "${script_name}: error: ${1}" >&2
   usage
   exit 1
 }
@@ -27,69 +27,69 @@ extract_variable() {
   grep "^${1}=" "${2}" | sed -E "s/^${1}=(.*)$/\1/"
 }
 
-database_username="$(extract_variable "MONGODB_USERNAME" "$script_dir/../.env")"
-database_password="$(extract_variable "MONGODB_PASSWORD" "$script_dir/../.env")"
-database_port="$(extract_variable "MONGODB_PORT" "$script_dir/../.env")"
+database_username="$(extract_variable "MONGODB_USERNAME" "${script_dir}/../.env")"
+database_password="$(extract_variable "MONGODB_PASSWORD" "${script_dir}/../.env")"
+database_port="$(extract_variable "MONGODB_PORT" "${script_dir}/../.env")"
 
 create_container_temporary_file() {
-  docker_compose_filepath="$1"
+  docker_compose_filepath="${1}"
 
   docker-compose \
-    --file "$docker_compose_filepath" \
+    --file "${docker_compose_filepath}" \
     exec \
     mongo \
     mktemp
 }
 
-container_temporary_filepath="$(create_container_temporary_file "$script_dir/../docker-compose.yml")"
+container_temporary_filepath="$(create_container_temporary_file "${script_dir}/../docker-compose.yml")"
 
 create_container_backup() {
-  docker_compose_filepath="$1"
-  database_username="$2"
-  database_password="$3"
-  database_port="$4"
-  container_filepath="$5"
+  docker_compose_filepath="${1}"
+  database_username="${2}"
+  database_password="${3}"
+  database_port="${4}"
+  container_filepath="${5}"
 
   docker-compose \
-    --file "$docker_compose_filepath" \
+    --file "${docker_compose_filepath}" \
     exec \
     mongo \
     mongodump \
-    --username="$database_username" \
-    --password="$database_password" \
-    --port="$database_port" \
-    --archive="$container_filepath" >/dev/null 2>&1
+    --username="${database_username}" \
+    --password="${database_password}" \
+    --port="${database_port}" \
+    --archive="${container_filepath}" >/dev/null 2>&1
 }
 
 create_container_backup \
-  "$script_dir/../docker-compose.yml" \
-  "$database_username" \
-  "$database_password" \
-  "$database_port" \
-  "$container_temporary_filepath"
+  "${script_dir}/../docker-compose.yml" \
+  "${database_username}" \
+  "${database_password}" \
+  "${database_port}" \
+  "${container_temporary_filepath}"
 
-backup_filepath="$(realpath "$script_dir/..")/backups/$(date +%Y/%m/%d/%Y-%m-%d-%H-%M-%S).archive"
+backup_filepath="$(realpath "${script_dir}/..")/backups/$(date +%Y/%m/%d/%Y-%m-%d-%H-%M-%S).archive"
 
 ensure_directory() {
-  mkdir -p "$1"
+  mkdir -p "${1}"
 }
 
-ensure_directory "$(dirname "$backup_filepath")"
+ensure_directory "$(dirname "${backup_filepath}")"
 
 restore_container_file() {
-  docker_compose_filepath="$1"
-  container_filepath="$2"
-  host_filepath="$3"
+  docker_compose_filepath="${1}"
+  container_filepath="${2}"
+  host_filepath="${3}"
 
   docker-compose \
-    --file "$docker_compose_filepath" \
+    --file "${docker_compose_filepath}" \
     cp \
-    "mongo:$container_filepath" "$host_filepath"
+    "mongo:${container_filepath}" "${host_filepath}"
 }
 
 restore_container_file \
-  "$script_dir/../docker-compose.yml" \
-  "$container_temporary_filepath" \
-  "$backup_filepath"
+  "${script_dir}/../docker-compose.yml" \
+  "${container_temporary_filepath}" \
+  "${backup_filepath}"
 
-printf "%s\n" "$backup_filepath"
+printf "%s\n" "${backup_filepath}"

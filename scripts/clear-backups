@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+
+set -e
+set -u
+
+script_name="$(basename "${0}")"
+script_dir="$(realpath "$(dirname "${0}")")"
+
+usage() {
+  echo "${script_name}: usage: ${script_name}" >&2
+}
+
+exit_with_error() {
+  echo "${script_name}: error: $1" >&2
+  usage
+  exit 1
+}
+
+recieved_arguments="$#"
+expected_arguments="0"
+
+if [ "${recieved_arguments}" != "${expected_arguments}" ]; then
+  exit_with_error "invalid number of arguments, expected \"${expected_arguments}\", recieved \"${recieved_arguments}\""
+fi
+
+clear_old_backups() {
+  find "${script_dir}/../backups" -maxdepth 4 -mindepth 4 -mtime +7 -delete
+}
+
+clear_empty_directories() {
+  find "${script_dir}/../backups" -type d -empty -delete
+}
+
+clear_old_backups
