@@ -1,63 +1,107 @@
 #!/usr/bin/env bash
 
-script_name="$0"
+set -e
+set -u
+
+script_name="$(basename "$0")"
 script_dir="$(realpath "$(dirname "$0")")"
 
-root_dir="$(realpath "$script_dir/..")"
-
-compose_filename="$root_dir/docker-compose.yml"
-env_filename="$root_dir/.env"
-
 usage() {
-  echo "$script_name: usage: $script_name"
+  echo "${script_name}: usage: ${script_name} ARCHIVE_FILE" >&2
 }
 
 exit_with_error() {
-  echo "$script_name: error: $1"
+  echo "${script_name}: error: $1" >&2
   usage
   exit 1
 }
 
-load_env() {
-  IFS=$'\n'
-  # shellcheck disable=SC2046
-  export $(grep -Ev '^#' "$1" | xargs -0)
-  IFS=
+recieved_arguments="$#"
+expected_arguments="1"
+
+if [ "${recieved_arguments}" != "${expected_arguments}" ]; then
+  exit_with_error "invalid number of arguments, expected \"${expected_arguments}\", recieved \"${recieved_arguments}\""
+fi
+
+backup_filepath="$1"
+
+if [ ! -r "$backup_filepath" ]; then
+  exit_with_error "invalid backup filepath \"$backup_filepath\""
+fi
+
+extract_variable() {
+  grep "^${1}=" "${2}" | sed -E "s/^${1}=(.*)$/\1/"
 }
 
-load_env "$env_filename"
+database_username="$(extract_variable "MONGODB_USERNAME" "$script_dir/../.env")"
+database_password="$(extract_variable "MONGODB_PASSWORD" "$script_dir/../.env")"
+database_port="$(extract_variable "MONGODB_PORT" "$script_dir/../.env")"
 
-if [ "$MONGODB_USERNAME" == "" ]; then
-  exit_with_error "missing env variable MONGODB_USERNAME"
-fi
+create_container_temporary_file() {
+  docker_compose_filepath="$1"
 
-if [ "$MONGODB_PASSWORD" == "" ]; then
-  exit_with_error "missing env variable MONGODB_PASSWORD"
-fi
+  docker-compose \
+    --file "$docker_compose_filepath" \
+    exec \
+    mongo \
+    mktemp
+}
 
-if [ "$MONGODB_PORT" == "" ]; then
-  exit_with_error "missing env variable MONGODB_PORT"
-fi
+container_temporary_filepath="$(create_container_temporary_file "$script_dir/../docker-compose.yml")"
 
-if [ "$#" != "1" ]; then
-  exit_with_error "invalid number of arguments"
-fi
+copy_host_file() {
+  docker_compose_filepath="$1"
+  host_filepath="$2"
+  container_filepath="$3"
 
-backup_filename="$1"
+  docker-compose \
+    --file "$docker_compose_filepath" \
+    cp \
+    "$host_filepath" "mongo:$container_filepath"
+}
 
-if [ ! -f "$backup_filename" ]; then
-  exit_with_error "$backup_filename is not a file"
-fi
+copy_host_file \
+  "$script_dir/../docker-compose.yml" \
+  "$backup_filepath" \
+  "$container_temporary_filepath"
 
-container_temp_filename="$(docker-compose -f "$compose_filename" exec mongo mktemp)"
+restore_container_archive() {
+  docker_compose_filepath="$1"
+  database_username="$2"
+  database_password="$3"
+  database_port="$4"
+  container_filepath="$5"
 
-docker cp "$backup_filename" "$(docker-compose -f "$compose_filename" ps -q mongo):$container_temp_filename"
+  docker-compose \
+    --file "$docker_compose_filepath" \
+    exec \
+    mongo \
+    mongorestore \
+    --username="$database_username" \
+    --password="$database_password" \
+    --port="$database_port" \
+    --archive="$container_filepath"
+}
 
-docker-compose -f "$compose_filename" \
-  exec mongo mongorestore \
-  --username "$MONGODB_USERNAME" \
-  --password "$MONGODB_PASSWORD" \
-  --port "$MONGODB_PORT" \
-  --archive="$container_temp_filename"
+restore_container_archive \
+  "$script_dir/../docker-compose.yml" \
+  "$database_username" \
+  "$database_password" \
+  "$database_port" \
+  "$container_temporary_filepath"
 
-docker-compose -f "$compose_filename" exec mongo rm "$container_temp_filename"
+remove_container_file() {
+  docker_compose_filepath="$1"
+  container_filepath="$2"
+
+  docker-compose \
+    --file "$docker_compose_filepath" \
+    exec \
+    mongo \
+    rm \
+    "$container_filepath"
+}
+
+remove_container_file \
+  "$script_dir/../docker-compose.yml" \
+  "$container_temporary_filepath"

@@ -11,7 +11,4 @@ services:
       - $MONGODB_PORT:$MONGODB_PORT
     restart: always
     volumes:
-      - mongodb_volume:/data/db
-
-volumes:
-  mongodb_volume:
+      - ./database:/data/db
