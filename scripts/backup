@@ -58,7 +58,7 @@ create_container_backup() {
     --username="$database_username" \
     --password="$database_password" \
     --port="$database_port" \
-    --archive="$container_filepath"
+    --archive="$container_filepath" >/dev/null 2>&1
 }
 
 create_container_backup \
@@ -74,7 +74,7 @@ ensure_directory() {
   mkdir -p "$1"
 }
 
-ensure_directory "$(dirname $backup_filepath)"
+ensure_directory "$(dirname "$backup_filepath")"
 
 restore_container_file() {
   docker_compose_filepath="$1"

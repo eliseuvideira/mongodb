@@ -80,7 +80,7 @@ restore_container_archive() {
     --username="$database_username" \
     --password="$database_password" \
     --port="$database_port" \
-    --archive="$container_filepath"
+    --archive="$container_filepath" >/dev/null 2>&1
 }
 
 restore_container_archive \
